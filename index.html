@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>チラシ配布管理（共有・フィルタ付）</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 15px; background-color: #f0f0f0; }
+        .container { max-width: 480px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { font-size: 1rem; text-align: center; margin: 0 0 15px 0; color: #333; }
+        label.input-label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 5px; color: #555; }
+        input, textarea { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
+        textarea { height: 60px; resize: none; }
+        
+        /* 登録用ボタン */
+        .status-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 15px; }
+        .status-grid label { text-align: left; padding: 12px 15px; border: 1px solid #ccc; border-radius: 5px; cursor: pointer; background: #fafafa; font-size: 0.9rem; }
+        input[type="radio"] { display: none; }
+        input[type="radio"]:checked + span { font-weight: bold; color: #fff; display: block; margin: -12px -15px; padding: 12px 15px; border-radius: 5px; }
+        
+        /* 絞り込みフィルター */
+        .filter-area { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 5px; }
+        .filter-btn { padding: 8px 12px; border: 1px solid #ccc; border-radius: 20px; font-size: 0.75rem; cursor: pointer; background: #fff; }
+        .filter-btn.active { background: #333; color: #fff; border-color: #333; }
+
+        #s1:checked + span, .bg-s1 { background: #28a745; }
+        #s2:checked + span, .bg-s2 { background: #007bff; }
+        #s3:checked + span, .bg-s3 { background: #ffc107; color: #000 !important; }
+        #s4:checked + span, .bg-s4 { background: #dc3545; }
+
+        button#regBtn { width: 100%; padding: 15px; background: #333; color: #fff; border: none; border-radius: 5px; font-size: 17px; font-weight: bold; cursor: pointer; }
+        button:disabled { background: #ccc; }
+        .alert { color: #d93025; font-size: 0.85rem; font-weight: bold; text-align: center; min-height: 1.5rem; }
+        .hit { background-color: #fff3cd !important; border: 2px solid #ffc107 !important; }
+        .header { border-bottom: 2px solid #333; margin-top: 15px; font-weight: bold; padding-bottom: 5px; font-size: 0.9rem; }
+        ul { padding: 0; list-style: none; margin-top: 10px; }
+        li { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: flex-start; }
+        .badge { font-size: 0.7rem; padding: 3px 6px; border-radius: 4px; color: #fff; margin-left: 5px; white-space: nowrap; }
+        .name { font-weight: bold; font-size: 1rem; }
+        .user-info { color: #666; font-size: 0.8rem; margin-top: 2px; }
+        .memo-text { color: #333; font-size: 0.85rem; margin-top: 5px; background: #f8f9fa; padding: 8px; border-radius: 4px; border: 1px solid #eee; }
+        #loading { text-align: center; font-size: 0.8rem; color: #666; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>チラシ配布管理（共有中）</h1>
+    <div id="loading">データ同期中...</div>
+    <div id="searchAlert" class="alert"></div>
+    
+    <label class="input-label">名前（投稿者）</label>
+    <input type="text" id="userName" placeholder="自分の名前">
+
+    <label class="input-label">店舗／施設名</label>
+    <input type="text" id="storeName" placeholder="検索・入力" oninput="searchStore()">
+    
+    <label class="input-label">対応状況</label>
+    <div class="status-grid">
+        <label><input type="radio" name="status" id="s1" value="新規チラシ配布済み" checked><span>新規チラシ配布済み</span></label>
+        <label><input type="radio" name="status" id="s2" value="旧→新チラシへ貼り替え済み"><span>旧→新チラシへ貼り替え済み</span></label>
+        <label><input type="radio" name="status" id="s3" value="旧チラシのまま"><span>旧チラシのまま</span></label>
+        <label><input type="radio" name="status" id="s4" value="配布不可"><span>配布不可</span></label>
+    </div>
+
+    <label class="input-label">備考</label>
+    <textarea id="storeMemo"></textarea>
+    
+    <button type="button" id="regBtn" onclick="regist()">登録する</button>
+    <div id="regMsg" style="text-align:center; color:green; font-weight:bold; margin-top:10px;"></div>
+
+    <div class="filter-area">
+        <div class="filter-btn active" onclick="filterList('すべて', this)">すべて</div>
+        <div class="filter-btn" onclick="filterList('新規チラシ配布済み', this)">新規</div>
+        <div class="filter-btn" onclick="filterList('旧→新チラシへ貼り替え済み', this)">貼り替え</div>
+        <div class="filter-btn" onclick="filterList('旧チラシのまま', this)">旧のまま</div>
+        <div class="filter-btn" onclick="filterList('配布不可', this)">不可</div>
+    </div>
+
+    <div class="header">登録済み一覧</div>
+    <ul id="storeList"></ul>
+</div>
+
+<script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxOxrLpPAdO0Iq-K_F9zf93-m6pmsf-f6c9uvJ2aDfUakRThdl-bz0UzGY-_5QIjqxX/exec";
+
+    let allData = [];
+    let currentFilter = "すべて";
+
+    async function loadData() {
+        document.getElementById('loading').textContent = "同期中...";
+        try {
+            const res = await fetch(GAS_URL);
+            allData = await res.json();
+            showList();
+            document.getElementById('loading').textContent = "最新の状態です (" + allData.length + "件)";
+        } catch (e) {
+            document.getElementById('loading').textContent = "読み込み失敗";
+        }
+    }
+
+    function filterList(type, btnEl) {
+        currentFilter = type;
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btnEl.classList.add('active');
+        showList();
+    }
+
+    function searchStore() {
+        const val = document.getElementById('storeName').value.trim();
+        const alertBox = document.getElementById('searchAlert');
+        const items = document.querySelectorAll('#storeList li');
+        let count = 0;
+        items.forEach(li => li.classList.remove('hit'));
+        alertBox.textContent = "";
+        if (!val) return;
+        
+        // フィルターに関係なく全データから検索
+        allData.forEach((item, i) => {
+            if (item["店舗名"] && item["店舗名"].indexOf(val) !== -1) {
+                count++;
+            }
+        });
+        if (count > 0) alertBox.textContent = "⚠️ すでに登録のある店舗名です";
+    }
+
+    function showList() {
+        const list = document.getElementById('storeList');
+        list.innerHTML = '';
+        
+        // フィルター適用
+        let displayData = currentFilter === "すべて" 
+            ? allData 
+            : allData.filter(d => d["ステータス"] === currentFilter);
+
+        displayData.sort((a, b) => (a["店舗名"] || "").localeCompare(b["店舗名"] || "", 'ja'));
+        
+        displayData.forEach((item, index) => {
+            if(!item["店舗名"]) return;
+            const li = document.createElement('li');
+            let badgeCls = 'bg-s1';
+            const s = item["ステータス"];
+            if(s === '旧→新チラシへ貼り替え済み') badgeCls = 'bg-s2';
+            if(s === '旧チラシのまま') badgeCls = 'bg-s3';
+            if(s === '配布不可') badgeCls = 'bg-s4';
+            
+            li.innerHTML = '<div>' +
+                '<div><span class="name">' + item["店舗名"] + '</span><span class="badge ' + badgeCls + '">' + s + '</span></div>' +
+                '<div class="user-info">担当: ' + (item["投稿者"] || '匿名') + '</div>' +
+                (item["備考"] ? '<div class="memo-text">' + item["備考"] + '</div>' : '') +
+                '</div>';
+            list.appendChild(li);
+        });
+    }
+
+    async function regist() {
+        const nameEl = document.getElementById('storeName');
+        const userEl = document.getElementById('userName');
+        const memoEl = document.getElementById('storeMemo');
+        const statusEl = document.querySelector('input[name="status"]:checked');
+        const btn = document.getElementById('regBtn');
+        const msgEl = document.getElementById('regMsg');
+        
+        const storeName = nameEl.value.trim();
+        if (!storeName) { alert("店舗名を入力してください"); return; }
+        
+        btn.disabled = true;
+        btn.textContent = "送信中...";
+
+        const payload = {
+            name: storeName, status: statusEl.value, user: userEl.value.trim() || '匿名', memo: memoEl.value.trim()
+        };
+
+        try {
+            await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload) });
+            nameEl.value = '';
+            memoEl.value = '';
+            msgEl.textContent = "✅ 送信完了！";
+            setTimeout(() => { msgEl.textContent = ""; }, 3000);
+            await loadData();
+        } catch (e) {
+            alert("エラーが発生しました。");
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "登録する";
+        }
+    }
+
+    loadData();
+</script>
+
+</body>
+</html>
